@@ -21,7 +21,7 @@ Windows 增强构建 `0.6.6-windows.2` 在当前基础上增加思考透传、Co
 - Cursor OAuth、动态模型发现、非流式、SSE 流式和错误路径
 - 插件自有 Cursor 管理页、受认证管理 API、模型禁用与本地估算用量
 
-Windows 适配已在 EasyCPA **v0.2.101** 的 CLIProxyAPI **v8.0.27** 上验证 DLL 加载、插件注册、Cursor 管理页、管理认证及 OAuth。真实账号经宿主 `/v1/responses` 调用 custom `apply_patch`，创建 2266 字节 HTML 后回传工具结果，两轮均正常完成并收到思考摘要事件。Windows 源码测试还覆盖模拟上游的非流式、SSE 和工具调用；大文件任务尚未完整重放。
+Windows 适配已在 EasyCPA **v0.2.101** 的 CLIProxyAPI **v8.0.27** 上验证 DLL 加载、插件注册、Cursor 管理页、管理认证及 OAuth。端到端验收经宿主 `/v1/responses` 调用 custom `apply_patch`，创建 HTML 后回传工具结果，两轮均正常完成并收到思考摘要事件。Windows 源码测试还覆盖模拟上游的非流式、SSE 和工具调用；大文件流程仍需进一步验证。
 
 ## 安装
 

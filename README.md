@@ -12,9 +12,9 @@
 | EasyCPA | v0.2.101，内置 CLIProxyAPI v8.0.27 |
 | 插件管理 | DLL 加载、注册、管理认证、Cursor 管理页及 OAuth |
 | 调用 | 非流式、SSE、思考透传、客户端工具调用和工具结果续轮 |
-| 真实文件创建 | 经宿主 `/v1/responses` 调用 custom `apply_patch`，创建 2266 字节 HTML 后回传工具结果，两轮正常完成 |
+| 文件创建验收 | 经宿主 `/v1/responses` 调用 custom `apply_patch`，创建 HTML 后回传工具结果，两轮正常完成 |
 
-插件实现 `/v1/chat/completions` 格式；`/v1/responses` 由 CLIProxyAPI 宿主转换。真实验收覆盖小文件创建，原先约 43 KB HTML 的长文件流程尚未完整重放。
+插件实现 `/v1/chat/completions` 格式；`/v1/responses` 由 CLIProxyAPI 宿主转换。端到端验收覆盖小文件创建，大文件流程仍需进一步验证。
 
 ## 下载与安装
 
