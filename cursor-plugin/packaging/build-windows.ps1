@@ -11,8 +11,8 @@ param(
 $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This build script requires Windows.' }
 if ([string]::IsNullOrWhiteSpace($CCompiler)) { $CCompiler = 'gcc' }
-$go = (Get-Command $GoCommand -CommandType Application -ErrorAction Stop).Source
-$cc = (Get-Command $CCompiler -CommandType Application -ErrorAction Stop).Source
+$go = (Get-Command $GoCommand -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+$cc = (Get-Command $CCompiler -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $projectDir = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { $OutputPath = Join-Path $projectDir "cursor-v$Version.dll" }
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
