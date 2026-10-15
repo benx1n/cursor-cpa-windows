@@ -159,7 +159,9 @@ func buildAction(run protoreflect.Message, request RunRequest) (protoreflect.Mes
 	}
 	prompt := request.Prompt
 	if request.Mode == FullReplay && request.System != "" {
-		prompt = request.System + "\n\n" + prompt
+		prompt = request.System + "\n\n" + toolPolicy(request.Tools) + "\n\n" + prompt
+	} else {
+		prompt = toolPolicy(request.Tools) + "\n\n" + prompt
 	}
 	if err := setString(userMessage, "text", prompt); err != nil {
 		return nil, err

@@ -7,17 +7,21 @@ func nativeExecPolicy(operation string, tools []ToolDefinition) string {
 	var candidates []string
 	switch operation {
 	case "shell":
-		candidates = []string{"bash", "shell", "exec"}
+		candidates = []string{"exec_command", "shell_command", "bash", "shell", "exec"}
 	case "read":
-		candidates = []string{"read", "read_file"}
+		candidates = []string{"read", "read_file", "exec_command", "shell_command"}
 	case "grep":
-		candidates = []string{"grep", "grep_search"}
+		candidates = []string{"grep", "grep_search", "exec_command", "shell_command"}
+	case "write":
+		candidates = []string{"apply_patch", "write_file", "exec_command", "shell_command"}
+	case "delete":
+		candidates = []string{"apply_patch", "delete_file", "exec_command", "shell_command"}
+	case "ls":
+		candidates = []string{"list_directory", "exec_command", "shell_command"}
 	}
 	for _, candidate := range candidates {
-		for _, tool := range tools {
-			if tool.Name == candidate {
-				return policy + fmt.Sprintf("use the exposed client tool `%s` instead, following its schema, or report that the operation is unavailable and stop", tool.Name)
-			}
+		if name := exposedTool(tools, candidate); name != "" {
+			return policy + fmt.Sprintf("use the exposed client tool `%s` through MCP server opencodex-responses instead, following its schema, or report that the operation is unavailable and stop", name)
 		}
 	}
 	return policy + "no matching client tool is exposed. Report that the operation is unavailable and stop"

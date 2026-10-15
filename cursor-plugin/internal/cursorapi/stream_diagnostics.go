@@ -46,7 +46,7 @@ func (state *streamState) annotateProgressTimeout(err error) error {
 
 func eventMakesProgress(kind cursorproto.EventKind) bool {
 	switch kind {
-	case cursorproto.EventText, cursorproto.EventThinking, cursorproto.EventTokens, cursorproto.EventToolCall, cursorproto.EventImage, cursorproto.EventDone:
+	case cursorproto.EventText, cursorproto.EventThinking, cursorproto.EventTokens, cursorproto.EventToolCall, cursorproto.EventToolProgress, cursorproto.EventImage, cursorproto.EventDone:
 		return true
 	case cursorproto.EventIgnored, cursorproto.EventCheckpoint:
 		return false
@@ -59,7 +59,7 @@ func eventExposesOutput(kind cursorproto.EventKind) bool {
 	switch kind {
 	case cursorproto.EventText, cursorproto.EventThinking, cursorproto.EventTokens, cursorproto.EventImage, cursorproto.EventDone:
 		return true
-	case cursorproto.EventIgnored, cursorproto.EventToolCall, cursorproto.EventCheckpoint:
+	case cursorproto.EventIgnored, cursorproto.EventToolCall, cursorproto.EventToolProgress, cursorproto.EventCheckpoint:
 		return false
 	default:
 		return false

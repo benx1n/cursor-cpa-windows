@@ -9,13 +9,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
+	"syscall"
 	"time"
 )
 
 const maxAuthResponseBytes = 1 << 20
+const maxPollRetries = 3
 
 type Endpoints struct {
 	LoginURL   string
@@ -53,6 +56,7 @@ type Credentials struct {
 	Type               string    `json:"type"`
 	DisabledModels     []string  `json:"disabled_models,omitempty"`
 	ToolLoopGuardTools []string  `json:"tool_loop_guard_tools,omitempty"`
+	ProxyURL           string    `json:"proxy_url,omitempty"`
 }
 
 type PollResult struct {
@@ -64,6 +68,7 @@ type loginState struct {
 	Verifier string    `json:"verifier"`
 	UUID     string    `json:"uuid"`
 	Expires  time.Time `json:"expires"`
+	Failures int       `json:"-"`
 }
 
 type tokenResponse struct {
@@ -153,24 +158,30 @@ func (service *Service) PollLogin(ctx context.Context, encodedState string) (Pol
 	}
 	response, err := service.client.Do(request)
 	if err != nil {
-		return PollResult{}, fmt.Errorf("poll Cursor login: %w", err)
+		err = withoutRequestURL(err)
+		return service.pollFailure(ctx, encodedState, err, transientPollError(err))
 	}
 	if response.StatusCode == http.StatusNotFound {
 		if err := response.Body.Close(); err != nil {
-			return PollResult{}, fmt.Errorf("close Cursor pending response: %w", err)
+			return service.pollFailure(ctx, encodedState, err, transientPollError(err))
 		}
+		service.mu.Lock()
+		if current, exists := service.loginStates[encodedState]; exists {
+			current.Failures = 0
+			service.loginStates[encodedState] = current
+		}
+		service.mu.Unlock()
 		return PollResult{Status: LoginPending}, nil
 	}
 	if response.StatusCode != http.StatusOK {
 		status := response.StatusCode
-		if err := response.Body.Close(); err != nil {
-			return PollResult{}, errors.Join(fmt.Errorf("Cursor login poll returned HTTP %d", status), err)
-		}
-		return PollResult{}, fmt.Errorf("Cursor login poll returned HTTP %d", status)
+		err := errors.Join(fmt.Errorf("upstream returned HTTP %d", status), response.Body.Close())
+		retryable := status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || status >= 500 && status <= 599
+		return service.pollFailure(ctx, encodedState, err, retryable)
 	}
 	var tokens tokenResponse
 	if err := decodeJSON(response.Body, &tokens); err != nil {
-		return PollResult{}, fmt.Errorf("decode Cursor login response: %w", err)
+		return service.pollFailure(ctx, encodedState, err, transientPollError(err))
 	}
 	credentials, err := credentialsFromTokens(tokens.AccessToken, tokens.RefreshToken, service.now())
 	if err != nil {
@@ -180,6 +191,48 @@ func (service *Service) PollLogin(ctx context.Context, encodedState string) (Pol
 	delete(service.loginStates, encodedState)
 	service.mu.Unlock()
 	return PollResult{Status: LoginSuccess, Credentials: credentials}, nil
+}
+
+// The host ends the whole OAuth session on any polling error. Let its next poll
+// retry a brief outage, while limiting consecutive failures for a broken proxy.
+func (service *Service) pollFailure(ctx context.Context, key string, err error, retryable bool) (PollResult, error) {
+	if ctx.Err() != nil {
+		return PollResult{}, fmt.Errorf("poll Cursor login: %w", ctx.Err())
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	state, exists := service.loginStates[key]
+	if exists && retryable && service.now().Before(state.Expires) {
+		state.Failures++
+		service.loginStates[key] = state
+		if state.Failures <= maxPollRetries {
+			return PollResult{Status: LoginPending}, nil
+		}
+	}
+	delete(service.loginStates, key)
+	return PollResult{}, fmt.Errorf("poll Cursor login: %w", err)
+}
+
+func transientPollError(err error) bool {
+	var networkError net.Error
+	if errors.As(err, &networkError) && (networkError.Timeout() || networkError.Temporary()) {
+		return true
+	}
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) ||
+		errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EPIPE)
+}
+
+// net/http wraps transport errors with the full URL, including the PKCE verifier.
+// Keep the underlying cause for errors.Is/As without exposing the request URL.
+func withoutRequestURL(err error) error {
+	for {
+		var requestError *url.Error
+		if !errors.As(err, &requestError) {
+			return err
+		}
+		err = requestError.Err
+	}
 }
 
 func randomUUID() (string, error) {

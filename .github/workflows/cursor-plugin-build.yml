@@ -1,6 +1,11 @@
 name: Cursor plugin build
 
 on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/cursor-plugin-build.yml"
+      - "cursor-plugin/**"
   push:
     branches:
       - cursor
@@ -54,17 +59,82 @@ jobs:
           path: |
             cursor-plugin/release/cursor-plugin-${{ steps.version.outputs.version }}-linux-amd64.tar.gz
             cursor-plugin/release/cursor_${{ steps.version.outputs.version }}_linux_amd64.zip
-            cursor-plugin/release/checksums.txt
           if-no-files-found: error
-      - name: Publish plugin store release
-        if: github.ref_type == 'tag'
+
+  windows-amd64:
+    runs-on: windows-2025
+    env:
+      CGO_ENABLED: '1'
+      GOARCH: amd64
+      GOOS: windows
+      CC: gcc
+    defaults:
+      run:
+        working-directory: cursor-plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cursor-plugin/go.mod
+          cache-dependency-path: cursor-plugin/go.sum
+      - uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+      - name: Test
+        run: go test -shuffle=on -count=1 ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = '0.6.6-windows.2'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $version = $env:GITHUB_REF_NAME.Substring(1) }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Build Windows amd64 plugin
+        shell: pwsh
+        run: ./packaging/build-windows.ps1 -Version "${{ steps.version.outputs.version }}" -OutputPath cursor.dll
+      - name: Package standalone installer
+        shell: pwsh
+        run: |
+          $env:CURSOR_PLUGIN_BINARY = Join-Path (Get-Location) 'cursor.dll'
+          ./packaging/build-release.ps1 "${{ steps.version.outputs.version }}"
+      - name: Package plugin store asset
+        shell: pwsh
+        run: |
+          $env:CURSOR_PLUGIN_BINARY = Join-Path (Get-Location) 'cursor.dll'
+          ./packaging/build-store-release.ps1 "${{ steps.version.outputs.version }}"
+      - name: Verify Windows installer
+        shell: pwsh
+        run: ./packaging/test-windows-install.ps1 -Archive "release/cursor-plugin-${{ steps.version.outputs.version }}-windows-amd64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cursor-plugin-${{ steps.version.outputs.version }}-windows-amd64
+          path: |
+            cursor-plugin/release/cursor-plugin-${{ steps.version.outputs.version }}-windows-amd64.zip
+            cursor-plugin/release/cursor_${{ steps.version.outputs.version }}_windows_amd64.zip
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [linux-amd64, windows-amd64]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cursor-plugin-*-amd64
+          path: release-assets
+          merge-multiple: true
+      - name: Create release checksums
+        working-directory: release-assets
+        run: sha256sum *.zip *.tar.gz > checksums.txt
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "$GITHUB_REF_NAME"
-          "release/cursor_${{ steps.version.outputs.version }}_linux_amd64.zip"
-          "release/checksums.txt"
-          "release/cursor-plugin-${{ steps.version.outputs.version }}-linux-amd64.tar.gz"
+          release-assets/*
           --repo "$GITHUB_REPOSITORY"
           --title "Cursor plugin $GITHUB_REF_NAME"
-          --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+          --notes-file "cursor-plugin/docs/releases/$GITHUB_REF_NAME.md"

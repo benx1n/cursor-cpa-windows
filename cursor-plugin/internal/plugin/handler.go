@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
+	"time"
 
 	"cursorplugin/internal/cursorapi"
 	"cursorplugin/internal/cursorauth"
@@ -19,14 +19,19 @@ type Handler struct {
 	usage    *usageStore
 	sessions *cursorsession.Store
 	turns    *sessionTurnLocks
+	network  *networkSettings
 }
 
+// Version can be set by release builds without changing the upstream base tag.
+var Version = "0.6.6"
+
 func NewHandler(dependencies Dependencies) *Handler {
+	network := &networkSettings{}
 	if dependencies.Auth == nil {
-		dependencies.Auth = cursorauth.NewService(http.DefaultClient, cursorauth.DefaultEndpoints())
+		dependencies.Auth = cursorauth.NewService(network.client(20*time.Second), cursorauth.DefaultEndpoints())
 	}
 	if dependencies.Cursor == nil {
-		client, err := cursorapi.NewClient(cursorapi.Config{BaseURL: "https://api2.cursor.sh"})
+		client, err := cursorapi.NewClient(cursorapi.Config{BaseURL: "https://api2.cursor.sh", HTTPClient: network.client(0)})
 		if err == nil {
 			dependencies.Cursor = client
 		}
@@ -34,7 +39,7 @@ func NewHandler(dependencies Dependencies) *Handler {
 	return &Handler{
 		auth: dependencies.Auth, cursor: dependencies.Cursor, emitter: dependencies.Emitter,
 		host: dependencies.Host, usage: newUsageStore(), sessions: cursorsession.NewStore(cursorsession.Options{}),
-		turns: newSessionTurnLocks(),
+		turns: newSessionTurnLocks(), network: network,
 	}
 }
 
@@ -56,6 +61,14 @@ func (handler *Handler) CallWithStatus(ctx context.Context, method string, reque
 }
 
 func (handler *Handler) dispatch(ctx context.Context, method string, request []byte) (any, error) {
+	if err := ValidateExecutorRequestSize(method, uint64(len(request))); err != nil {
+		return nil, err
+	}
+	var err error
+	ctx, err = handler.network.context(ctx, method, request)
+	if err != nil {
+		return nil, err
+	}
 	switch method {
 	case "plugin.register", "plugin.reconfigure":
 		return registration(), nil
@@ -101,7 +114,7 @@ func registration() map[string]any {
 		"schema_version": 3,
 		"metadata": map[string]any{
 			"Name":             "cursor",
-			"Version":          "0.6.6",
+			"Version":          Version,
 			"Author":           "yobo",
 			"GitHubRepository": "https://github.com/yobo2u/omsub",
 			"Logo":             "",

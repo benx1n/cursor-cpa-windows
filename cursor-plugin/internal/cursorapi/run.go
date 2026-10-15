@@ -77,7 +77,11 @@ func (client *Client) Run(
 	defer cancelOverall()
 	runContext, cancelRun := context.WithCancelCause(overallContext)
 	defer cancelRun(nil)
-	watchdogs := newRunWatchdogs(cancelRun, client)
+	watchdogConfig := *client
+	if len(input.Tools) > 0 {
+		watchdogConfig.progress = client.toolProgress
+	}
+	watchdogs := newRunWatchdogs(cancelRun, &watchdogConfig)
 	defer watchdogs.stop()
 
 	runBodyReader, runBodyWriter := io.Pipe()

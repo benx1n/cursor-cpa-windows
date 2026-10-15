@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -66,7 +67,7 @@ func Test_Checkpoint_EncodeRunRequest_distinguishes_full_replay_suffix_and_resum
 		wantPendingCalls int
 		wantText         string
 	}{
-		{name: "full replay", mode: FullReplay, prompt: "full prompt", wantAction: "user_message_action", wantText: "system\n\nfull prompt"},
+		{name: "full replay", mode: FullReplay, prompt: "full prompt", wantAction: "user_message_action", wantText: "full prompt"},
 		{name: "checkpoint suffix", mode: CheckpointSuffix, checkpoint: checkpoint, prompt: "suffix only", wantAction: "user_message_action", wantPendingCalls: 1, wantText: "suffix only"},
 		{name: "checkpoint resume", mode: CheckpointResume, checkpoint: checkpoint, wantAction: "resume_action", wantPendingCalls: 1},
 	}
@@ -103,7 +104,14 @@ func Test_Checkpoint_EncodeRunRequest_distinguishes_full_replay_suffix_and_resum
 			require.Equal(t, "/root/.cursor/projects/workspace", environment.Get(field(environment, "project_folder")).String())
 			if tt.wantAction == "user_message_action" {
 				userMessage := contextParent.Get(field(contextParent, "user_message")).Message()
-				require.Equal(t, tt.wantText, userMessage.Get(field(userMessage, "text")).String())
+				text := userMessage.Get(field(userMessage, "text")).String()
+				require.True(t, strings.HasSuffix(text, "\n\n"+tt.wantText))
+				require.Contains(t, text, "<gateway_tool_policy>")
+				if tt.mode == FullReplay {
+					require.True(t, strings.HasPrefix(text, "system\n\n"))
+				} else {
+					require.NotContains(t, text, "system\n\n")
+				}
 			}
 		})
 	}

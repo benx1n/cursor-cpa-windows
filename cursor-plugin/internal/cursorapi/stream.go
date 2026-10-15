@@ -129,7 +129,24 @@ func (state *streamState) handleFrame(
 			return false, context.Cause(ctx)
 		}
 	}
-	reply, handled, err = imageWrites.HandleServerMessage(frame.Payload)
+	reply, handled, err = cursorproto.ReplyNativeFileExec(frame.Payload, environment.Tools)
+	if err != nil {
+		return false, err
+	}
+	if handled {
+		state.result.InteractionResponded = true
+		select {
+		case outbound <- reply:
+			watchdogs.sawProgress()
+		case <-ctx.Done():
+			return false, context.Cause(ctx)
+		}
+	}
+	if !handled {
+		reply, handled, err = imageWrites.HandleServerMessage(frame.Payload)
+	} else {
+		handled = false
+	}
 	if err != nil {
 		return false, err
 	}
@@ -204,8 +221,15 @@ func (state *streamState) handleFrame(
 	}
 	if eventMakesProgress(event.Kind) {
 		watchdogs.sawProgress()
-		if state.result.TTFT == 0 && event.Kind != cursorproto.EventDone {
+		if state.result.TTFT == 0 && event.Kind != cursorproto.EventDone && event.Kind != cursorproto.EventToolProgress {
 			state.result.TTFT = time.Since(state.started)
+			// Some Windows clocks have a coarse resolution and can report zero
+			// for an event delivered in the same tick as stream setup. Keep the
+			// metric positive so it remains distinguishable from an unobserved
+			// first token while preserving the measured value whenever possible.
+			if state.result.TTFT <= 0 {
+				state.result.TTFT = time.Nanosecond
+			}
 		}
 	}
 	state.result.OutputExposed = state.result.OutputExposed || eventExposesOutput(event.Kind)

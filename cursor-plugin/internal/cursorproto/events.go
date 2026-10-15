@@ -12,14 +12,15 @@ import (
 type EventKind string
 
 const (
-	EventIgnored    EventKind = "ignored"
-	EventText       EventKind = "text"
-	EventThinking   EventKind = "thinking"
-	EventTokens     EventKind = "tokens"
-	EventToolCall   EventKind = "tool_call"
-	EventImage      EventKind = "image"
-	EventCheckpoint EventKind = "checkpoint"
-	EventDone       EventKind = "done"
+	EventIgnored      EventKind = "ignored"
+	EventText         EventKind = "text"
+	EventThinking     EventKind = "thinking"
+	EventTokens       EventKind = "tokens"
+	EventToolCall     EventKind = "tool_call"
+	EventToolProgress EventKind = "tool_progress"
+	EventImage        EventKind = "image"
+	EventCheckpoint   EventKind = "checkpoint"
+	EventDone         EventKind = "done"
 )
 
 type ServerEvent struct {
@@ -128,6 +129,8 @@ func decodeInteraction(interaction protoreflect.Message) (ServerEvent, error) {
 		return ServerEvent{Kind: EventIgnored, Type: "interaction_update"}, nil
 	}
 	switch active.Name() {
+	case "partial_tool_call", "tool_call_delta", "tool_call_started":
+		return ServerEvent{Kind: EventToolProgress, Type: "interaction_update." + string(active.Name())}, nil
 	case "text_delta", "thinking_delta", "token_delta", "tool_call_completed", "turn_ended":
 		return eventFromField(active.Name(), interaction.Get(active).Message())
 	default:

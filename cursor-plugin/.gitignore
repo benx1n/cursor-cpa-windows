@@ -1,4 +1,9 @@
 /cursor.so
+/cursor.dll
+/cursor.h
+/cursor-*.dll
+/cursor-*.h
 /release/checksums.txt
 /release/cursor-plugin-*.tar.gz
+/release/cursor-plugin-*.zip
 /release/cursor_*.zip

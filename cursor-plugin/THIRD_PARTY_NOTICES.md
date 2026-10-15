@@ -1,5 +1,14 @@
 # Third-party notices
 
+## cursor-cpa-plugin enhanced
+
+Reasoning content passthrough and the no-client-tool prompt guidance are adapted
+from kilolonion/cursor-cpa-plugin at commit
+`388690742290b45004a21fca9abfddee4361d8f7` (MIT, Copyright (c) 2026 kilolonion).
+The MIT license text and copyright notices are included in `LICENSE`.
+
+Repository: https://github.com/kilolonion/cursor-cpa-plugin
+
 ## opencodex
 
 Cursor protocol behavior and the embedded protobuf descriptor are derived from opencodex at commit `5840591322117f3ee9568b35b135a6d4339f7711`.

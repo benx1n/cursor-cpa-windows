@@ -16,6 +16,7 @@ type Turn struct {
 	model         string
 	created       int64
 	text          string
+	reasoning     string
 	tools         []responseToolCall
 	images        []responseImage
 	toolIDOwners  map[string]string
@@ -46,10 +47,11 @@ type completionChoice struct {
 }
 
 type assistantMessage struct {
-	Role      string             `json:"role,omitempty"`
-	Content   string             `json:"content,omitempty"`
-	ToolCalls []responseToolCall `json:"tool_calls,omitempty"`
-	Images    []responseImage    `json:"images,omitempty"`
+	Role             string             `json:"role,omitempty"`
+	Content          string             `json:"content,omitempty"`
+	ReasoningContent string             `json:"reasoning_content,omitempty"`
+	ToolCalls        []responseToolCall `json:"tool_calls,omitempty"`
+	Images           []responseImage    `json:"images,omitempty"`
 }
 
 type responseImage struct {
@@ -93,6 +95,15 @@ func (turn *Turn) StreamChunk(text string) ([]byte, error) {
 		}},
 	}
 	return marshalStreamPayload(payload)
+}
+
+// StreamReasoning keeps upstream thinking separate from the answer body.
+func (turn *Turn) StreamReasoning(text string) ([]byte, error) {
+	turn.reasoning += text
+	return marshalStreamPayload(chatCompletion{
+		ID: turn.id, Object: "chat.completion.chunk", Created: turn.created, Model: turn.model,
+		Choices: []completionChoice{{Index: 0, Delta: &assistantMessage{Role: "assistant", ReasoningContent: text}}},
+	})
 }
 
 func (turn *Turn) StreamToolCall(id, name, arguments string) ([]byte, error) {
@@ -155,7 +166,7 @@ func (turn *Turn) Completion(prompt string) ([]byte, error) {
 		Model:   turn.model,
 		Choices: []completionChoice{{
 			Index:        0,
-			Message:      &assistantMessage{Role: "assistant", Content: turn.text, ToolCalls: turn.tools, Images: turn.images},
+			Message:      &assistantMessage{Role: "assistant", Content: turn.text, ReasoningContent: turn.reasoning, ToolCalls: turn.tools, Images: turn.images},
 			FinishReason: &finish,
 		}},
 		Usage: turn.EstimatedUsage(prompt),
@@ -169,6 +180,10 @@ func (turn *Turn) Completion(prompt string) ([]byte, error) {
 
 func (turn *Turn) AddText(text string) {
 	turn.text += text
+}
+
+func (turn *Turn) AddReasoning(text string) {
+	turn.reasoning += text
 }
 
 func (turn *Turn) AddToolCall(id, name, arguments string) {
@@ -222,6 +237,7 @@ func newResponseImage(index int, mimeType string, data []byte) (responseImage, e
 func (turn *Turn) EstimatedUsage(prompt string) Usage {
 	var completion strings.Builder
 	completion.WriteString(turn.text)
+	completion.WriteString(turn.reasoning)
 	for _, call := range turn.tools {
 		completion.WriteString(call.ID)
 		completion.WriteString(call.Function.Name)

@@ -7,15 +7,21 @@
 
 ## 当前源码版本
 
-当前源码版本为 **0.6.6**，补齐上下文准入、会话排队与 Blob 预算、输出截断和模型发现可用性保护，变更见[版本说明](docs/releases/v0.6.6.md)，安装包见 [GitHub Release v0.6.6](https://github.com/yobo2u/omsub/releases/tag/v0.6.6)。更新源码或打包版本不会自动升级已运行插件或启用账户策略；安装前请校验同一 Release 的 `checksums.txt`。
+本分支当前 Windows 增强构建为 **0.6.6-windows.2**，变更见 [Windows 版本说明](docs/releases/v0.6.6-windows.2.md)，安装包可从[本仓库 CI](https://github.com/benx1n/cursor-cpa-windows/actions/workflows/cursor-plugin-build.yml) 的成功构建获取。
+
+基础源码版本为 **0.6.6**，补齐上下文准入、会话排队与 Blob 预算、输出截断和模型发现可用性保护，变更见[上游版本说明](docs/releases/v0.6.6.md)，Linux 安装包见 [上游 GitHub Release v0.6.6](https://github.com/yobo2u/omsub/releases/tag/v0.6.6)。更新源码或打包版本不会自动升级已运行插件；标签发布包请校验同一 Release 的 `checksums.txt`。
 
 ## 已验证宿主环境
+
+Windows 增强构建 `0.6.6-windows.2` 在当前基础上增加思考透传、Codex 客户端工具引导、原生文本文件操作拒绝与更长的有界工具等待，保留已有资源预算。详见 [Windows EasyCPA 安装说明](docs/windows-easycpa.md)。
 
 - CLIProxyAPI `v7.3.17`，提交 `9bdde54`
 - CPA Manager Plus `v1.14.0`
 - Linux amd64
 - Cursor OAuth、动态模型发现、非流式、SSE 流式和错误路径
 - 插件自有 Cursor 管理页、受认证管理 API、模型禁用与本地估算用量
+
+Windows 适配已在 EasyCPA **v0.2.101** 的 CLIProxyAPI **v8.0.27** 上验证 DLL 加载、插件注册、Cursor 管理页、管理认证及 OAuth。真实账号经宿主 `/v1/responses` 调用 custom `apply_patch`，创建 2266 字节 HTML 后回传工具结果，两轮均正常完成并收到思考摘要事件。Windows 源码测试还覆盖模拟上游的非流式、SSE 和工具调用；大文件任务尚未完整重放。
 
 ## 安装
 
@@ -25,14 +31,19 @@
 `cursor` 安装。商店会从最新的 `v<version>` GitHub Release 下载当前平台 ZIP，
 并用同一 Release 中的 `checksums.txt` 校验文件。
 
-0.6.6 商店格式包仅面向 Linux amd64：
+构建流程按平台生成以下商店格式包（上游 v0.6.6 Release 只提供 Linux 包）：
 
 ```text
 cursor_0.6.6_linux_amd64.zip
+cursor_0.6.6-windows.2_windows_amd64.zip
 checksums.txt
 ```
 
 ### 手动安装
+
+Windows EasyCPA 的 PowerShell 7 安装步骤和本机 `cpa-core` 路径示例见[Windows EasyCPA 安装说明](docs/windows-easycpa.md)。Windows 手动包为 `cursor-plugin-0.6.6-windows.2-windows-amd64.zip`，安装脚本会把版本化 DLL 放到 `plugins\windows\amd64`。
+
+Linux：
 
 解压发布包，然后把 `--plugins-dir` 指向 CLIProxyAPI 配置中的 `plugins.dir`：
 
@@ -90,16 +101,23 @@ curl https://your-cpa.example/v1/chat/completions \
 
 ## 升级和卸载
 
-再次运行新版本 `install.sh` 即可升级；旧二进制会备份到插件目录的 `.cursor-backups/`。
+再次运行新版本安装脚本即可升级；旧二进制会备份到插件目录的 `.cursor-backups/`。
 
 ```sh
 sudo ./uninstall.sh --plugins-dir /opt/cpa-manager-plus/cliproxyapi/plugins
+```
+
+Windows PowerShell 7：
+
+```powershell
+.\uninstall.ps1 -PluginsDir 'D:\Apps\EasyCPA\cpa-core\plugins'
 ```
 
 卸载脚本不会直接删除二进制，而是移动到 `.cursor-uninstalled/`。随后在 CPA Manager Plus 中禁用 `cursor` 并重启 CLIProxyAPI。OAuth 凭据不会自动删除，避免误删账号数据。
 
 ## 能力与边界
 
+- Windows 增强版本提供思考透传、客户端工具引导及原生文本文件操作拒绝；提示无法保证模型绝不尝试原生工具。CLIProxyAPI 8.0.27 的完成后 HTTP 499 记录和流式 `error_details` 映射问题仍需核心配套修复，详见 [Windows 版本说明](docs/releases/v0.6.6-windows.2.md)。
 - 0.6.1 的可选工具循环防护、检查点命中优化和增量摘要说明见[行为与验收说明](docs/cursor-tool-loop-and-cache.md)。硬停止默认关闭，仅对账户认证 JSON 中 `tool_loop_guard_tools` 精确列出的工具启用；本版本不会自动修改账户策略，也不保证消除所有重复操作。
 - 0.6.3 的工具交接、结构化超时和宿主配套要求见[流式错误边界](docs/cursor-stream-failures.md)。不支持结构化错误的宿主仍可读取错误字符串，但不会自动获得修正后的冷却与重试分类；不能仅升级插件就视为问题全部解除。
 - v0.5.10 的修复和升级说明见[发布说明](docs/releases/v0.5.10.md)。原生 grep/read/shell 请求会收到完整的不可执行协议回复，由客户端已公开的工具完成实际操作；网关不会执行这些原生文件读取或命令。
@@ -121,7 +139,7 @@ sudo ./uninstall.sh --plugins-dir /opt/cpa-manager-plus/cliproxyapi/plugins
 - Cursor 没有公开、稳定的 OAuth 订阅剩余额度接口；管理页不会伪造百分比或余额。
 - 成功/失败请求来自 CLIProxyAPI 的 `request.complete` 终态回调；同一用户请求即使发生宿主重试，最多记录一次最终结果。近期请求 ID 通过两个独立的 15 分钟 Bloom 时间窗去重，固定占用 16 MiB；在单窗不超过 100 万个完成事件（约 1,111 次/秒）的设计负载内，双窗查询的理论误判概率低于 `6e-8`。误判会跳过一条本地终态样本，使计数少计并保留此前的最近结果。宿主自身的成功/失败值按“调度尝试”单独展示。
 - token usage 为每次 Cursor 插件执行的本地估算值（包括宿主重试触发的再次执行），不代表 Cursor 账单或订阅额度，进程重启后重新计数。
-- 当前发布包只提供 Linux amd64；其他平台需要对应平台的 CGO 工具链重新构建。
+- 构建流程提供 Linux amd64 和 Windows amd64；其他平台需要对应平台的 CGO 工具链重新构建。
 
 CLIProxyAPI 动态库插件是进程内受信代码。请只安装来自可信来源且校验过 `SHA256SUMS` 的构建。使用时应遵守 Cursor 的服务条款和可接受使用政策，不应共享账号、转售访问或规避配额与安全控制。
 

@@ -30,9 +30,14 @@ typedef struct {
 	cliproxy_plugin_shutdown_fn shutdown;
 } cliproxy_plugin_api;
 
-extern int cliproxyPluginCall(char*, uint8_t*, size_t, cliproxy_buffer*);
-extern void cliproxyPluginFree(void*, size_t);
-extern void cliproxyPluginShutdown(void);
+#ifdef _WIN32
+#define CLIPROXY_EXPORT __declspec(dllexport)
+#else
+#define CLIPROXY_EXPORT
+#endif
+extern CLIPROXY_EXPORT int cliproxyPluginCall(char*, uint8_t*, size_t, cliproxy_buffer*);
+extern CLIPROXY_EXPORT void cliproxyPluginFree(void*, size_t);
+extern CLIPROXY_EXPORT void cliproxyPluginShutdown(void);
 
 static const cliproxy_host_api* stored_host;
 

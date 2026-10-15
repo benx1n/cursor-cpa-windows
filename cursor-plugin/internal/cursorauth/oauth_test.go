@@ -48,6 +48,7 @@ func Test_Service_Refresh_preserves_refresh_token_when_response_omits_it(t *test
 		RefreshToken:   "old-refresh",
 		Type:           "cursor",
 		DisabledModels: []string{"gpt-5"},
+		ProxyURL:       "http://account-proxy.example:7890",
 	})
 
 	// Then
@@ -55,6 +56,7 @@ func Test_Service_Refresh_preserves_refresh_token_when_response_omits_it(t *test
 	require.Equal(t, "new-access", credentials.AccessToken)
 	require.Equal(t, "old-refresh", credentials.RefreshToken)
 	require.Equal(t, []string{"gpt-5"}, credentials.DisabledModels)
+	require.Equal(t, "http://account-proxy.example:7890", credentials.ProxyURL)
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

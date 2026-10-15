@@ -111,6 +111,7 @@ func (handler *Handler) cursorAccountStatusWithCredential(ctx context.Context, f
 	if credentialErr != nil {
 		return cursorAccountStatus{}, credentialErr
 	}
+	ctx = accountProxyContext(ctx, credential.ProxyURL)
 	models, err := handler.cursor.DiscoverModels(ctx, credential.AccessToken)
 	if err != nil {
 		return cursorAccountStatus{}, fmt.Errorf("discover Cursor models: %w", err)
@@ -181,6 +182,7 @@ func (handler *Handler) updateDisabledModels(ctx context.Context, body []byte) (
 	if err != nil {
 		return managementError(http.StatusBadGateway, err.Error()), nil
 	}
+	ctx = accountProxyContext(ctx, credential.ProxyURL)
 	available, err := handler.cursor.DiscoverModels(ctx, credential.AccessToken)
 	if err != nil {
 		return managementError(http.StatusBadGateway, "discover Cursor models: "+err.Error()), nil

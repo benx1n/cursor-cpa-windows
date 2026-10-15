@@ -20,7 +20,7 @@ func (service *Service) Refresh(ctx context.Context, current Credentials) (Crede
 	request.Header.Set("content-type", "application/json")
 	response, err := service.client.Do(request)
 	if err != nil {
-		return Credentials{}, fmt.Errorf("refresh Cursor token: %w", err)
+		return Credentials{}, fmt.Errorf("refresh Cursor token: %w", withoutRequestURL(err))
 	}
 	if response.StatusCode != http.StatusOK {
 		status := response.StatusCode
@@ -42,5 +42,6 @@ func (service *Service) Refresh(ctx context.Context, current Credentials) (Crede
 	}
 	refreshed.DisabledModels = append([]string(nil), current.DisabledModels...)
 	refreshed.ToolLoopGuardTools = append([]string(nil), current.ToolLoopGuardTools...)
+	refreshed.ProxyURL = current.ProxyURL
 	return refreshed, nil
 }

@@ -58,6 +58,7 @@ type authData struct {
 	StorageJSON      []byte            `json:"StorageJSON"`
 	Metadata         map[string]string `json:"Metadata,omitempty"`
 	Attributes       map[string]string `json:"Attributes,omitempty"`
+	ProxyURL         string            `json:"ProxyURL,omitempty"`
 	NextRefreshAfter time.Time         `json:"NextRefreshAfter,omitempty"`
 }
 

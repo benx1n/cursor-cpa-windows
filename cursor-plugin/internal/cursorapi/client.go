@@ -18,14 +18,15 @@ import (
 )
 
 const (
-	maxModelResponseBytes    = 4 << 20
-	defaultHeartbeatInterval = 5 * time.Second
-	defaultFirstDataTimeout  = 30 * time.Second
-	defaultFrameSilence      = 30 * time.Second
-	defaultProgressTimeout   = 90 * time.Second
-	defaultOverallTimeout    = 15 * time.Minute
-	defaultTrailingDrain     = 100 * time.Millisecond
-	defaultClientVersion     = "cli-2026.07.16-899851b"
+	maxModelResponseBytes      = 4 << 20
+	defaultHeartbeatInterval   = 5 * time.Second
+	defaultFirstDataTimeout    = 30 * time.Second
+	defaultFrameSilence        = 30 * time.Second
+	defaultProgressTimeout     = 90 * time.Second
+	defaultToolProgressTimeout = 5 * time.Minute
+	defaultOverallTimeout      = 15 * time.Minute
+	defaultTrailingDrain       = 100 * time.Millisecond
+	defaultClientVersion       = "cli-2026.07.16-899851b"
 )
 
 var (
@@ -44,6 +45,7 @@ type Config struct {
 	FirstFrameTimeout    time.Duration
 	FrameSilenceTimeout  time.Duration
 	ProgressTimeout      time.Duration
+	ToolProgressTimeout  time.Duration
 	OverallTimeout       time.Duration
 	TrailingDrainTimeout time.Duration
 }
@@ -58,6 +60,7 @@ type Client struct {
 	firstData     time.Duration
 	frameSilence  time.Duration
 	progress      time.Duration
+	toolProgress  time.Duration
 	overall       time.Duration
 	trailingDrain time.Duration
 }
@@ -95,6 +98,12 @@ func NewClient(config Config) (*Client, error) {
 	if config.FrameSilenceTimeout <= 0 {
 		config.FrameSilenceTimeout = defaultFrameSilence
 	}
+	if config.ToolProgressTimeout <= 0 {
+		config.ToolProgressTimeout = config.ProgressTimeout
+		if config.ToolProgressTimeout <= 0 {
+			config.ToolProgressTimeout = defaultToolProgressTimeout
+		}
+	}
 	if config.ProgressTimeout <= 0 {
 		config.ProgressTimeout = defaultProgressTimeout
 	}
@@ -114,6 +123,7 @@ func NewClient(config Config) (*Client, error) {
 		firstData:     config.FirstDataTimeout,
 		frameSilence:  config.FrameSilenceTimeout,
 		progress:      config.ProgressTimeout,
+		toolProgress:  config.ToolProgressTimeout,
 		overall:       config.OverallTimeout,
 		trailingDrain: config.TrailingDrainTimeout,
 	}, nil

@@ -31,6 +31,8 @@ func (handler *Handler) execute(ctx context.Context, raw []byte) (any, error) {
 		switch event.Kind {
 		case cursorproto.EventText:
 			turn.AddText(event.Text)
+		case cursorproto.EventThinking:
+			turn.AddReasoning(event.Text)
 		case cursorproto.EventImage:
 			turn.AddImage(event.MIMEType, event.ImageData)
 		case cursorproto.EventToolCall:
@@ -92,14 +94,9 @@ func (handler *Handler) runStream(parent context.Context, request executorReques
 			return handler.emitter.Emit(ctx, request.StreamID, chunk)
 		case cursorproto.EventDone:
 			done = true
-			chunk, err := turn.FinalChunk(inputText)
-			if err != nil {
-				return err
-			}
-			if err := handler.emitter.Emit(ctx, request.StreamID, chunk); err != nil {
-				return err
-			}
-			return handler.emitter.Emit(ctx, request.StreamID, []byte("[DONE]"))
+			// Finish after Run returns, so checkpoint draining and cleanup cannot
+			// race a client disconnect triggered by our terminal marker.
+			return nil
 		case cursorproto.EventToolCall:
 			chunk, err := turn.StreamToolCall(event.ID, event.Name, event.Arguments)
 			if err != nil {
@@ -110,7 +107,13 @@ func (handler *Handler) runStream(parent context.Context, request executorReques
 			}
 			toolCallSeen = true
 			return nil
-		case cursorproto.EventIgnored, cursorproto.EventThinking, cursorproto.EventTokens:
+		case cursorproto.EventThinking:
+			chunk, err := turn.StreamReasoning(event.Text)
+			if err != nil {
+				return err
+			}
+			return handler.emitter.Emit(ctx, request.StreamID, chunk)
+		case cursorproto.EventIgnored, cursorproto.EventTokens, cursorproto.EventToolProgress:
 			return nil
 		default:
 			return nil
@@ -121,7 +124,7 @@ func (handler *Handler) runStream(parent context.Context, request executorReques
 		turn.MarkLengthLimited()
 		runErr = nil
 	}
-	if runErr == nil && (toolCallSeen || limited) && !done {
+	if runErr == nil && (done || toolCallSeen || limited) {
 		chunk, err := turn.FinalChunk(inputText)
 		if err != nil {
 			runErr = err

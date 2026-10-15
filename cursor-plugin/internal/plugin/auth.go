@@ -136,6 +136,7 @@ func buildAuthData(credentials cursorauth.Credentials) (authData, error) {
 		StorageJSON:      storage,
 		Metadata:         map[string]string{"type": "cursor", "email": credentials.Email},
 		Attributes:       map[string]string{"account_id": credentials.AccountID},
+		ProxyURL:         credentials.ProxyURL,
 		NextRefreshAfter: credentials.ExpiresAt,
 	}, nil
 }

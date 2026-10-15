@@ -39,7 +39,10 @@ func Test_EncodeRunRequest_places_model_and_prompt_in_wire_message(t *testing.T)
 	action := run.Get(field(run, "action")).Message()
 	userAction := action.Get(field(action, "user_message_action")).Message()
 	userMessage := userAction.Get(field(userAction, "user_message")).Message()
-	require.Equal(t, "Answer briefly.\n\nReply with cursor-plugin-ok", userMessage.Get(field(userMessage, "text")).String())
+	text := userMessage.Get(field(userMessage, "text")).String()
+	require.Contains(t, text, "Answer briefly.\n\n")
+	require.Contains(t, text, "No client filesystem")
+	require.Contains(t, text, "\n\nReply with cursor-plugin-ok")
 	requestContext := userAction.Get(field(userAction, "request_context")).Message()
 	environment := requestContext.Get(field(requestContext, "env")).Message()
 	require.Equal(t, "Asia/Shanghai", environment.Get(field(environment, "time_zone")).String())
@@ -129,7 +132,7 @@ func Test_DecodeServerEvent_names_ignored_top_level_message(t *testing.T) {
 	require.Equal(t, "kv_server_message", event.Type)
 }
 
-func Test_DecodeServerEvent_names_ignored_interaction_update(t *testing.T) {
+func Test_DecodeServerEvent_names_tool_progress_interaction_update(t *testing.T) {
 	server, err := newMessage("AgentServerMessage")
 	require.NoError(t, err)
 	interaction, err := nestedMessage(server, "interaction_update")
@@ -144,7 +147,7 @@ func Test_DecodeServerEvent_names_ignored_interaction_update(t *testing.T) {
 	event, err := DecodeServerEvent(raw)
 
 	require.NoError(t, err)
-	require.Equal(t, EventIgnored, event.Kind)
+	require.Equal(t, EventToolProgress, event.Kind)
 	require.Equal(t, "interaction_update.tool_call_started", event.Type)
 }
 
